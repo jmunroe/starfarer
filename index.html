@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starfarer — an interactive atlas of real stars, planets &amp; sci-fi worlds</title>
+<meta name="description" content="Explore 15,000+ real stars and 5,200 confirmed exoplanets in 3D, and visit the real star systems behind Project Hail Mary, Star Trek, Contact, Dune and more.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;circle cx='50' cy='50' r='22' fill='%237fd4ff'/&gt;&lt;circle cx='50' cy='50' r='40' fill='none' stroke='%237fd4ff' stroke-width='4' opacity='0.5'/&gt;&lt;/svg&gt;">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<div id="scene-container"></div>
+
+<div id="loading">
+  <div class="load-box">
+    <div class="load-title">STARFARER</div>
+    <div class="load-sub">loading star catalogs…</div>
+    <div class="load-bar"><div id="load-fill"></div></div>
+  </div>
+</div>
+
+<header id="topbar">
+  <div id="brand">
+    <span class="brand-name">STARFARER</span>
+    <span class="brand-sub">real stars · real planets · fictional worlds</span>
+  </div>
+  <div id="searchwrap">
+    <input id="search" type="text" placeholder="Search stars &amp; systems… (e.g. Tau Ceti, Vulcan, TRAPPIST-1)" autocomplete="off" spellcheck="false">
+    <div id="search-results" hidden></div>
+  </div>
+  <nav id="topnav">
+    <button id="btn-tours" class="nav-btn" title="Guided sci-fi tours">TOURS</button>
+    <button id="btn-zoom" class="nav-btn" title="Cosmic zoom: quantum to omniverse">ZOOM</button>
+    <button id="btn-filters" class="nav-btn" title="Filter the map">FILTERS</button>
+    <button id="btn-units" class="nav-btn" title="Toggle distance units">LY</button>
+    <button id="btn-help" class="nav-btn" title="Help">?</button>
+  </nav>
+</header>
+
+<div id="filters-panel" class="panel" hidden>
+  <div class="panel-head">MAP FILTERS <button class="panel-close" data-close="filters-panel">×</button></div>
+  <label class="chk"><input type="checkbox" id="flt-hosts"> Only stars with known planets</label>
+  <label class="chk"><input type="checkbox" id="flt-eye"> Only naked-eye stars (mag ≤ 6.5)</label>
+  <div class="flt-group">
+    <div class="flt-label">Spectral class</div>
+    <div id="spect-chips">
+      <button class="chip on" data-sp="O">O</button><button class="chip on" data-sp="B">B</button><button class="chip on" data-sp="A">A</button><button class="chip on" data-sp="F">F</button><button class="chip on" data-sp="G">G</button><button class="chip on" data-sp="K">K</button><button class="chip on" data-sp="M">M</button><button class="chip on" data-sp="other">other</button>
+    </div>
+  </div>
+  <div class="flt-group">
+    <div class="flt-label">Max distance: <span id="dist-val">∞</span></div>
+    <input type="range" id="flt-dist" min="1" max="100" value="100" step="1">
+  </div>
+  <div class="flt-group">
+    <label class="chk"><input type="checkbox" id="opt-grid" checked> Distance grid</label>
+    <label class="chk"><input type="checkbox" id="opt-labels" checked> Star labels</label>
+    <label class="chk"><input type="checkbox" id="opt-rings" checked> Planet-host markers</label>
+  </div>
+  <button id="flt-reset" class="ghost-btn">Reset filters</button>
+  <div id="flt-count" class="flt-note"></div>
+</div>
+
+<div id="tours-panel" class="panel" hidden>
+  <div class="panel-head">SCI-FI TOURS <button class="panel-close" data-close="tours-panel">×</button></div>
+  <p class="panel-blurb">Guided journeys through the <em>real</em> star systems where science fiction is set. Story is fiction; every star is real.</p>
+  <div id="tour-list"></div>
+</div>
+
+<aside id="infopanel" hidden>
+  <button id="info-close" class="panel-close">×</button>
+  <div id="info-name"></div>
+  <div id="info-tag"></div>
+  <div id="info-body"></div>
+</aside>
+
+<div id="tourcard" hidden>
+  <div id="tour-head">
+    <span id="tour-title"></span>
+    <button id="tour-exit" class="panel-close">×</button>
+  </div>
+  <div id="tour-stopname"></div>
+  <div id="tour-story"></div>
+  <div id="tour-science"></div>
+  <div id="tour-nav">
+    <button id="tour-prev" class="ghost-btn">← prev</button>
+    <span id="tour-step"></span>
+    <button id="tour-next" class="ghost-btn">next →</button>
+  </div>
+</div>
+
+<div id="systemview" hidden>
+  <div id="sys-topbar">
+    <button id="sys-back" class="ghost-btn">← back to star map</button>
+    <div id="sys-title"></div>
+    <div id="sys-controls">
+      <button id="sys-play" class="ghost-btn" title="play/pause orbits">⏸</button>
+      <label id="sys-speedwrap">speed <input type="range" id="sys-speed" min="0" max="3" step="0.01" value="1"></label>
+      <label class="chk small"><input type="checkbox" id="sys-log" checked> log distance scale</label>
+    </div>
+  </div>
+  <canvas id="sys-canvas"></canvas>
+  <div id="sys-side"></div>
+  <div id="sys-legend">
+    <span class="lg"><i class="sw hz"></i>habitable zone (est.)</span>
+    <span class="lg"><i class="sw rocky"></i>rocky</span>
+    <span class="lg"><i class="sw super"></i>super-Earth</span>
+    <span class="lg"><i class="sw neptune"></i>Neptune-like</span>
+    <span class="lg"><i class="sw giant"></i>gas giant</span>
+    <span class="lg"><i class="sw unknown"></i>unknown</span>
+  </div>
+</div>
+
+<div id="cosmiczoom" hidden>
+  <canvas id="cz-canvas"></canvas>
+  <div id="cz-top">
+    <button id="cz-close" class="ghost-btn">← back to star map</button>
+    <div id="cz-heading">
+      <div id="cz-name">The living creature</div>
+      <div id="cz-note">~1 m</div>
+    </div>
+  </div>
+  <div id="cz-blurb">Trillions of cells, cooperating.</div>
+  <div id="cz-controls">
+    <button id="cz-in" class="cz-btn" title="zoom in toward the quantum scale">− IN</button>
+    <div id="cz-track">
+      <input type="range" id="cz-slider">
+      <div id="cz-ticks">
+        <span>Planck</span><span>atom</span><span>cell</span><span>you</span><span>planet</span><span>stars</span><span>galaxy</span><span>universe</span><span>omniverse</span>
+      </div>
+      <div id="cz-scale">viewport ≈ 1 m</div>
+    </div>
+    <button id="cz-out" class="cz-btn" title="zoom out toward the omniverse">OUT +</button>
+  </div>
+</div>
+
+<div id="help-panel" class="panel wide" hidden>
+  <div class="panel-head">HOW TO EXPLORE <button class="panel-close" data-close="help-panel">×</button></div>
+  <div class="help-cols">
+    <div>
+      <h4>Star map</h4>
+      <ul>
+        <li><b>drag</b> — orbit the view</li>
+        <li><b>scroll / pinch</b> — zoom</li>
+        <li><b>right-drag</b> — pan</li>
+        <li><b>click a star</b> — inspect it</li>
+        <li><b>double-click</b> — fly to it</li>
+        <li><b>Esc</b> — close panels</li>
+      </ul>
+    </div>
+    <div>
+      <h4>What you're seeing</h4>
+      <ul>
+        <li>15,000+ real stars from the <b>HYG&nbsp;v4.1</b> catalog (Hipparcos / Yale / Gliese), positioned in true 3D.</li>
+        <li>5,200 confirmed exoplanets from the <b>Open Exoplanet Catalogue</b>. Cyan diamonds mark planet hosts.</li>
+        <li>Star colors and sizes are derived from measured color index and luminosity.</li>
+        <li>Open a planet system to see orbits and the star's estimated habitable zone.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="credits">
+    Data: <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener">HYG Database v4.1</a> (CC&nbsp;BY-SA&nbsp;4.0) ·
+    <a href="https://github.com/OpenExoplanetCatalogue/oec_tables" target="_blank" rel="noopener">Open Exoplanet Catalogue</a> (MIT) ·
+    rendering <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> ·
+    inspired by <a href="https://valhovey.github.io/gaia-mary/" target="_blank" rel="noopener">gaia-mary</a>
+  </div>
+</div>
+
+<div id="hud">
+  <span id="hud-focus"></span>
+  <span id="hud-range"></span>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
