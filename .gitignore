@@ -1,0 +1,10 @@
+# Raw source catalogs (large; regenerate with tools/fetch_data.sh)
+tools/raw/
+
+# Node / tooling
+node_modules/
+package-lock.json
+*.log
+
+# OS
+.DS_Store
